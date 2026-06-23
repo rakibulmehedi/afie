@@ -1,0 +1,30 @@
+# env — never commit secrets
+.env
+.env.local
+.env.*.local
+
+# JS / Node
+node_modules/
+.pnpm-store/
+.turbo/
+
+# Next.js
+.next/
+out/
+coverage/
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+*.egg-info/
+
+# Claude Code local settings (machine-specific permissions)
+.claude/settings.local.json
+
+# SWC compiler cache
+.swc/
+
+# misc
+.DS_Store
+*.log

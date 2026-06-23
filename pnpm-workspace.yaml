@@ -1,0 +1,4 @@
+packages:
+  - "apps/web"
+  - "packages/*"
+  # apps/ai-worker intentionally absent — uv manages Python, pnpm/turbo never touch it
