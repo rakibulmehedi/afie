@@ -88,29 +88,31 @@ def mock_receiver_verify_raises(monkeypatch: pytest.MonkeyPatch) -> MagicMock:
 @pytest.fixture()
 def mock_ingest_to_db(monkeypatch: pytest.MonkeyPatch) -> AsyncMock:
     """
-    Replace app.api.consume.ingest_to_db with an AsyncMock so background-task
-    scheduling can be observed without touching any database.
+    Replace build_ingest_use_case with a factory returning a mock use case so
+    background-task scheduling can be observed without touching any database.
     """
-    mock_fn = AsyncMock()
-    monkeypatch.setattr("app.api.consume.ingest_to_db", mock_fn)
-    return mock_fn
+    mock_uc = MagicMock()
+    mock_uc.execute = AsyncMock()
+    monkeypatch.setattr("app.api.consume.build_ingest_use_case", lambda: mock_uc)
+    return mock_uc.execute
 
 
 @pytest.fixture()
 def mock_orchestrate_pipeline(monkeypatch: pytest.MonkeyPatch) -> AsyncMock:
     """
-    Replace app.api.consume.orchestrate_pipeline with an AsyncMock so the
-    pipeline background task does not attempt real DB or LLM calls in unit tests.
+    Replace build_synthesize_use_case with a factory returning a mock use case so
+    the pipeline background task does not attempt real DB or LLM calls in unit tests.
     """
-    mock_fn = AsyncMock()
-    monkeypatch.setattr("app.api.consume.orchestrate_pipeline", mock_fn)
-    return mock_fn
+    mock_uc = MagicMock()
+    mock_uc.execute = AsyncMock()
+    monkeypatch.setattr("app.api.consume.build_synthesize_use_case", lambda: mock_uc)
+    return mock_uc.execute
 
 
 @pytest.fixture()
 def mock_db_pool(monkeypatch: pytest.MonkeyPatch) -> MagicMock:
     """
-    Replace app.db.session.pool with a mock so the lifespan startup does not
+    Replace app.infrastructure.db.session.pool with a mock so the lifespan startup does not
     try to open a real PostgreSQL connection during unit tests.
     """
     mock_pool = MagicMock()
@@ -119,7 +121,7 @@ def mock_db_pool(monkeypatch: pytest.MonkeyPatch) -> MagicMock:
     mock_conn = AsyncMock()
     mock_pool.connection.return_value.__aenter__ = AsyncMock(return_value=mock_conn)
     mock_pool.connection.return_value.__aexit__ = AsyncMock(return_value=False)
-    monkeypatch.setattr("app.db.session.pool", mock_pool)
+    monkeypatch.setattr("app.infrastructure.db.session.pool", mock_pool)
     return mock_pool
 
 
@@ -144,7 +146,7 @@ async def unit_client(
             qstash_next_signing_key="next-key",
             database_url="postgresql://test/test",
         ),
-    ), patch("app.db.session.create_pool", new_callable=AsyncMock):
+    ), patch("app.infrastructure.db.session.create_pool", new_callable=AsyncMock):
         async with AsyncClient(
             transport=ASGITransport(app=app), base_url="http://testserver"
         ) as client:
@@ -168,7 +170,7 @@ async def unit_client_bad_sig(
             qstash_next_signing_key="next-key",
             database_url="postgresql://test/test",
         ),
-    ), patch("app.db.session.create_pool", new_callable=AsyncMock):
+    ), patch("app.infrastructure.db.session.create_pool", new_callable=AsyncMock):
         async with AsyncClient(
             transport=ASGITransport(app=app), base_url="http://testserver"
         ) as client:
@@ -327,7 +329,7 @@ class TestConsumeEndpointSignature:
                 qstash_next_signing_key="next-key",
                 database_url="postgresql://test/test",
             ),
-        ), patch("app.db.session.create_pool", new_callable=AsyncMock):
+        ), patch("app.infrastructure.db.session.create_pool", new_callable=AsyncMock):
             async with AsyncClient(
                 transport=ASGITransport(app=app), base_url="http://testserver"
             ) as client:

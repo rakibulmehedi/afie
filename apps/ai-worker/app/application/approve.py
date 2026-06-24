@@ -19,12 +19,12 @@ class ApproveUseCase:
     def __init__(self, saga_repo: ISagaRepository) -> None:
         self.saga_repo = saga_repo
 
-    async def execute(self, conn: object, payload: object) -> tuple[object, object]:
+    async def execute(self, conn: object, payload: object) -> tuple[object, object, object]:
         """Process APPROVE or REJECT decision.
 
         Performs all DB mutations within the caller-managed transaction.
-        Returns (target_platform, posting_token) for APPROVE,
-        (None, None) for REJECT.
+        Returns (saga_id, target_platform, posting_token) for APPROVE,
+        (saga_id, None, None) for REJECT.
 
         Raises HTTPException(404) if draft/saga not found.
         Raises HTTPException(409) on optimistic lock conflict.
@@ -67,6 +67,7 @@ class ApproveUseCase:
 
         target_platform: object = None
         posting_token: object = None
+        saga_id_out: object = saga_id
 
         if p.decision == "REJECT":
             await conn.execute(  # type: ignore[union-attr]
@@ -169,4 +170,4 @@ class ApproveUseCase:
                 (str(saga_id), str(p.tenant_id), p.actor),
             )
 
-        return target_platform, posting_token
+        return saga_id_out, target_platform, posting_token

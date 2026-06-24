@@ -4,7 +4,7 @@ from typing import AsyncGenerator
 from fastapi import FastAPI
 
 from app.core.settings import get_settings
-from app.db.session import create_pool, pool
+from app.infrastructure.db.session import create_pool, pool
 
 
 @asynccontextmanager

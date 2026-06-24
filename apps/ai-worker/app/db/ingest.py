@@ -18,7 +18,7 @@ async def ingest_to_db(payload: ConsumePayload) -> None:
     Errors are logged but NOT re-raised — the caller has already returned
     HTTP 200 to QStash, so re-raising would trigger a false retry.
     """
-    from app.db.session import pool  # late import avoids circular at module load
+    from app.infrastructure.db.session import pool  # late import avoids circular at module load
 
     if pool is None:
         logger.error(

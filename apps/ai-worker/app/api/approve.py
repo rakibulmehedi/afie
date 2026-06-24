@@ -9,7 +9,7 @@ from pydantic import ValidationError
 from app.api.deps import verify_qstash_signature
 from app.api.schemas import ApprovePayload
 from app.core.settings import get_settings
-from app.db.session import get_conn
+from app.infrastructure.db.session import get_conn
 
 logger = logging.getLogger(__name__)
 
@@ -19,175 +19,25 @@ __all__ = ["ApprovePayload", "router"]
 
 
 async def _process_approve(payload: ApprovePayload) -> None:
-    """Execute the approval/rejection logic in a single DB transaction.
+    """Delegate DB logic to ApproveUseCase; publish QStash after commit if APPROVE."""
+    from app.core.container import build_approve_use_case  # noqa: PLC0415
 
-    Decision flow:
-    - REJECT: marks draft as REJECTED, transitions saga AWAITING_APPROVAL → REJECTED
-    - APPROVE: marks draft as APPROVED/EDITED, transitions saga AWAITING_APPROVAL → APPROVED,
-               then publishes a QStash distribution message after the transaction commits.
+    approve_uc = build_approve_use_case()
+    saga_id_out: object = None
+    target_platform: object = None
+    posting_token: object = None
 
-    The DB trigger ``trg_saga_touch`` auto-increments ``version`` on every UPDATE to
-    ``feature_sagas``.  To avoid double-incrementing, we do NOT set ``version = version + 1``
-    in our SQL — the trigger handles it.  We still use the current version value in the
-    WHERE clause for optimistic locking.
-    """
     async for conn in get_conn():
         async with conn.transaction():
             await conn.execute(
                 "SET LOCAL app.current_tenant = %s",
                 (str(payload.tenant_id),),
             )
+            saga_id_out, target_platform, posting_token = await approve_uc.execute(conn, payload)
 
-            # Lock and fetch the draft row
-            draft_cursor = await conn.execute(
-                """
-                SELECT id, saga_id, approval_status
-                  FROM cspe_drafts
-                 WHERE id = %s
-                   FOR UPDATE
-                """,
-                (str(payload.draft_id),),
-            )
-            draft_row = await draft_cursor.fetchone()
-            if draft_row is None:
-                raise HTTPException(status_code=404, detail="Draft not found")
-
-            _, saga_id, _ = draft_row
-
-            # Lock and fetch the saga row
-            saga_cursor = await conn.execute(
-                """
-                SELECT id, status, version
-                  FROM feature_sagas
-                 WHERE id = %s
-                   FOR UPDATE
-                """,
-                (str(saga_id),),
-            )
-            saga_row = await saga_cursor.fetchone()
-            if saga_row is None:
-                raise HTTPException(status_code=404, detail="Saga not found")
-
-            _, saga_status, saga_version = saga_row
-
-            # Initialized here so they're always bound; set in APPROVE branch below.
-            target_platform: object = None
-            posting_token: object = None
-
-            if payload.decision == "REJECT":
-                await conn.execute(
-                    """
-                    UPDATE cspe_drafts
-                       SET approval_status = 'REJECTED',
-                           decided_at = now()
-                     WHERE id = %s
-                    """,
-                    (str(payload.draft_id),),
-                )
-
-                # Optimistic-lock transition: AWAITING_APPROVAL → REJECTED
-                # We rely on trg_saga_touch to increment version; do NOT add version+1 here.
-                update_cursor = await conn.execute(
-                    """
-                    UPDATE feature_sagas
-                       SET status     = 'REJECTED',
-                           updated_at = now()
-                     WHERE id        = %s
-                       AND tenant_id = %s
-                       AND version   = %s
-                       AND status    = 'AWAITING_APPROVAL'
-                    """,
-                    (str(saga_id), str(payload.tenant_id), saga_version),
-                )
-
-                if update_cursor.rowcount == 0:
-                    # Optimistic lock conflict — another worker already advanced the saga
-                    logger.warning(
-                        "Optimistic lock conflict on saga %s (version=%s, status=%s) "
-                        "during REJECT; skipping saga advance.",
-                        saga_id,
-                        saga_version,
-                        saga_status,
-                    )
-                    raise HTTPException(
-                        status_code=409,
-                        detail="Saga version conflict — transition already applied or status changed",
-                    )
-
-                # Record the transition event with the actor from payload
-                await conn.execute(
-                    """
-                    INSERT INTO feature_saga_events
-                                (saga_id, tenant_id, from_status, to_status, actor)
-                    VALUES (%s, %s, 'AWAITING_APPROVAL', 'REJECTED', %s)
-                    """,
-                    (str(saga_id), str(payload.tenant_id), payload.actor),
-                )
-
-            else:
-                # decision == "APPROVE"
-                approval_status = "EDITED" if payload.edited_content is not None else "APPROVED"
-
-                approve_cursor = await conn.execute(
-                    """
-                    UPDATE cspe_drafts
-                       SET approval_status = %s,
-                           decided_at      = now(),
-                           edited_content  = %s
-                     WHERE id = %s
-                    RETURNING saga_id, target_platform, posting_token, tenant_id
-                    """,
-                    (approval_status, payload.edited_content, str(payload.draft_id)),
-                )
-
-                returning_row = await approve_cursor.fetchone()
-                if returning_row is None:
-                    raise HTTPException(status_code=404, detail="Draft not found on APPROVE update")
-
-                _, target_platform, posting_token, _ = returning_row
-
-                # Optimistic-lock transition: AWAITING_APPROVAL → APPROVED
-                # We rely on trg_saga_touch to increment version; do NOT add version+1 here.
-                update_cursor = await conn.execute(
-                    """
-                    UPDATE feature_sagas
-                       SET status     = 'APPROVED',
-                           updated_at = now()
-                     WHERE id        = %s
-                       AND tenant_id = %s
-                       AND version   = %s
-                       AND status    = 'AWAITING_APPROVAL'
-                    """,
-                    (str(saga_id), str(payload.tenant_id), saga_version),
-                )
-
-                if update_cursor.rowcount == 0:
-                    logger.warning(
-                        "Optimistic lock conflict on saga %s (version=%s, status=%s) "
-                        "during APPROVE; skipping saga advance.",
-                        saga_id,
-                        saga_version,
-                        saga_status,
-                    )
-                    raise HTTPException(
-                        status_code=409,
-                        detail="Saga version conflict — transition already applied or status changed",
-                    )
-
-                # Record the transition event with the actor from payload
-                await conn.execute(
-                    """
-                    INSERT INTO feature_saga_events
-                                (saga_id, tenant_id, from_status, to_status, actor)
-                    VALUES (%s, %s, 'AWAITING_APPROVAL', 'APPROVED', %s)
-                    """,
-                    (str(saga_id), str(payload.tenant_id), payload.actor),
-                )
-
-        # Transaction committed — now publish QStash if APPROVE
         if payload.decision == "APPROVE":
             await _publish_distribution(
-                saga_id=str(saga_id),
+                saga_id=str(saga_id_out),
                 draft_id=str(payload.draft_id),
                 platform=str(target_platform),
                 posting_token=str(posting_token),

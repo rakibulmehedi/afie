@@ -189,10 +189,10 @@ def mock_receiver_verify_raises(monkeypatch: pytest.MonkeyPatch) -> MagicMock:
 
 @pytest.fixture()
 def mock_db_pool_with_conn(monkeypatch: pytest.MonkeyPatch) -> tuple[MagicMock, AsyncMock]:
-    """Patch app.db.session.pool with a mock that has a working connection."""
+    """Patch app.infrastructure.db.session.pool with a mock that has a working connection."""
     conn = _make_mock_conn()
     pool = _make_pool_with_conn(conn)
-    monkeypatch.setattr("app.db.session.pool", pool)
+    monkeypatch.setattr("app.infrastructure.db.session.pool", pool)
     return pool, conn
 
 
@@ -217,7 +217,7 @@ class TestApproveEndpoint:
         from app.main import app
 
         with patch("app.core.settings.get_settings", return_value=_MOCK_SETTINGS), patch(
-            "app.db.session.create_pool", new_callable=AsyncMock
+            "app.infrastructure.db.session.create_pool", new_callable=AsyncMock
         ):
             async with AsyncClient(
                 transport=ASGITransport(app=app), base_url="http://testserver"
@@ -241,7 +241,7 @@ class TestApproveEndpoint:
         from app.main import app
 
         with patch("app.core.settings.get_settings", return_value=_MOCK_SETTINGS), patch(
-            "app.db.session.create_pool", new_callable=AsyncMock
+            "app.infrastructure.db.session.create_pool", new_callable=AsyncMock
         ):
             async with AsyncClient(
                 transport=ASGITransport(app=app), base_url="http://testserver"
@@ -266,7 +266,7 @@ class TestApproveEndpoint:
 
         body = {k: v for k, v in VALID_REJECT_BODY.items() if k != "draft_id"}
         with patch("app.core.settings.get_settings", return_value=_MOCK_SETTINGS), patch(
-            "app.db.session.create_pool", new_callable=AsyncMock
+            "app.infrastructure.db.session.create_pool", new_callable=AsyncMock
         ):
             async with AsyncClient(
                 transport=ASGITransport(app=app), base_url="http://testserver"
@@ -291,7 +291,7 @@ class TestApproveEndpoint:
 
         body = {k: v for k, v in VALID_REJECT_BODY.items() if k != "tenant_id"}
         with patch("app.core.settings.get_settings", return_value=_MOCK_SETTINGS), patch(
-            "app.db.session.create_pool", new_callable=AsyncMock
+            "app.infrastructure.db.session.create_pool", new_callable=AsyncMock
         ):
             async with AsyncClient(
                 transport=ASGITransport(app=app), base_url="http://testserver"
@@ -316,7 +316,7 @@ class TestApproveEndpoint:
 
         body = {**VALID_REJECT_BODY, "decision": "MAYBE"}
         with patch("app.core.settings.get_settings", return_value=_MOCK_SETTINGS), patch(
-            "app.db.session.create_pool", new_callable=AsyncMock
+            "app.infrastructure.db.session.create_pool", new_callable=AsyncMock
         ):
             async with AsyncClient(
                 transport=ASGITransport(app=app), base_url="http://testserver"
@@ -342,7 +342,7 @@ class TestApproveEndpoint:
         # Capture SQL calls via the mock connection
         conn = _make_mock_conn(saga_update_rowcount=1)
         pool = _make_pool_with_conn(conn)
-        monkeypatch.setattr("app.db.session.pool", pool)
+        monkeypatch.setattr("app.infrastructure.db.session.pool", pool)
 
         executed_sqls: list[str] = []
         original_execute = conn.execute
@@ -354,7 +354,7 @@ class TestApproveEndpoint:
         conn.execute = tracking_execute
 
         with patch("app.core.settings.get_settings", return_value=_MOCK_SETTINGS), patch(
-            "app.db.session.create_pool", new_callable=AsyncMock
+            "app.infrastructure.db.session.create_pool", new_callable=AsyncMock
         ):
             async with AsyncClient(
                 transport=ASGITransport(app=app), base_url="http://testserver"
@@ -390,10 +390,10 @@ class TestApproveEndpoint:
 
         conn = _make_mock_conn(saga_update_rowcount=0)  # simulate lock conflict
         pool = _make_pool_with_conn(conn)
-        monkeypatch.setattr("app.db.session.pool", pool)
+        monkeypatch.setattr("app.infrastructure.db.session.pool", pool)
 
         with patch("app.core.settings.get_settings", return_value=_MOCK_SETTINGS), patch(
-            "app.db.session.create_pool", new_callable=AsyncMock
+            "app.infrastructure.db.session.create_pool", new_callable=AsyncMock
         ):
             async with AsyncClient(
                 transport=ASGITransport(app=app), base_url="http://testserver"
@@ -419,7 +419,7 @@ class TestApproveEndpoint:
 
         conn = _make_mock_conn(saga_update_rowcount=1)
         pool = _make_pool_with_conn(conn)
-        monkeypatch.setattr("app.db.session.pool", pool)
+        monkeypatch.setattr("app.infrastructure.db.session.pool", pool)
 
         executed_sqls: list[str] = []
         executed_params: list[Any] = []
@@ -433,7 +433,7 @@ class TestApproveEndpoint:
         conn.execute = tracking_execute
 
         with patch("app.core.settings.get_settings", return_value=_MOCK_SETTINGS), patch(
-            "app.db.session.create_pool", new_callable=AsyncMock
+            "app.infrastructure.db.session.create_pool", new_callable=AsyncMock
         ), patch("app.api.approve._publish_distribution", new_callable=AsyncMock):
             async with AsyncClient(
                 transport=ASGITransport(app=app), base_url="http://testserver"
@@ -471,7 +471,7 @@ class TestApproveEndpoint:
 
         conn = _make_mock_conn(saga_update_rowcount=1)
         pool = _make_pool_with_conn(conn)
-        monkeypatch.setattr("app.db.session.pool", pool)
+        monkeypatch.setattr("app.infrastructure.db.session.pool", pool)
 
         executed_sqls: list[str] = []
         executed_params: list[Any] = []
@@ -485,7 +485,7 @@ class TestApproveEndpoint:
         conn.execute = tracking_execute
 
         with patch("app.core.settings.get_settings", return_value=_MOCK_SETTINGS), patch(
-            "app.db.session.create_pool", new_callable=AsyncMock
+            "app.infrastructure.db.session.create_pool", new_callable=AsyncMock
         ), patch("app.api.approve._publish_distribution", new_callable=AsyncMock):
             async with AsyncClient(
                 transport=ASGITransport(app=app), base_url="http://testserver"
@@ -521,13 +521,13 @@ class TestApproveEndpoint:
 
         conn = _make_mock_conn(saga_update_rowcount=1)
         pool = _make_pool_with_conn(conn)
-        monkeypatch.setattr("app.db.session.pool", pool)
+        monkeypatch.setattr("app.infrastructure.db.session.pool", pool)
 
         mock_publish = AsyncMock()
         monkeypatch.setattr("app.api.approve._publish_distribution", mock_publish)
 
         with patch("app.core.settings.get_settings", return_value=_MOCK_SETTINGS), patch(
-            "app.db.session.create_pool", new_callable=AsyncMock
+            "app.infrastructure.db.session.create_pool", new_callable=AsyncMock
         ):
             async with AsyncClient(
                 transport=ASGITransport(app=app), base_url="http://testserver"
@@ -560,7 +560,7 @@ class TestApproveEndpoint:
 
         conn = _make_mock_conn(saga_update_rowcount=1)
         pool = _make_pool_with_conn(conn)
-        monkeypatch.setattr("app.db.session.pool", pool)
+        monkeypatch.setattr("app.infrastructure.db.session.pool", pool)
 
         # Patch AsyncQStash to ensure it is NOT called
         mock_async_qstash_cls = MagicMock()
@@ -570,7 +570,7 @@ class TestApproveEndpoint:
 
         with patch("app.core.settings.get_settings", return_value=_MOCK_SETTINGS_NO_TOPIC), patch(
             "app.api.approve.get_settings", return_value=_MOCK_SETTINGS_NO_TOPIC
-        ), patch("app.db.session.create_pool", new_callable=AsyncMock):
+        ), patch("app.infrastructure.db.session.create_pool", new_callable=AsyncMock):
             async with AsyncClient(
                 transport=ASGITransport(app=app), base_url="http://testserver"
             ) as client:
@@ -597,7 +597,7 @@ class TestApproveEndpoint:
 
         conn = AsyncMock()
         pool = _make_pool_with_conn(conn)
-        monkeypatch.setattr("app.db.session.pool", pool)
+        monkeypatch.setattr("app.infrastructure.db.session.pool", pool)
 
         # Make execute() raise a generic database error
         conn.execute = AsyncMock(side_effect=Exception("DB connection lost"))
@@ -609,7 +609,7 @@ class TestApproveEndpoint:
         conn.transaction = MagicMock(return_value=tx_cm)
 
         with patch("app.core.settings.get_settings", return_value=_MOCK_SETTINGS), patch(
-            "app.db.session.create_pool", new_callable=AsyncMock
+            "app.infrastructure.db.session.create_pool", new_callable=AsyncMock
         ):
             async with AsyncClient(
                 transport=ASGITransport(app=app), base_url="http://testserver"

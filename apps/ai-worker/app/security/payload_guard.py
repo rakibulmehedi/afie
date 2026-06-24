@@ -78,3 +78,8 @@ def _clean(text: str) -> str:
     text = _INJECTION_RE.sub("[injection attempt removed]", text)
     text = _CONTROL_RE.sub(" ", text)
     return text.strip()
+
+
+class PayloadGuard:
+    def sanitize(self, source: str, raw_payload: str) -> str:
+        return sanitize_payload(source, raw_payload)
