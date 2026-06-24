@@ -9,17 +9,17 @@ import crypto from 'node:crypto'
 // env vars are set via jest.setup.env.js (runs before any module loads)
 
 // Mock lib modules with factory
-jest.mock('@/lib/qstash', () => ({
+jest.mock('@/lib/messaging/qstash', () => ({
   publishEnvelope: jest.fn(),
 }))
-jest.mock('@/lib/redis', () => ({
+jest.mock('@/lib/messaging/redis', () => ({
   lookupTenant: jest.fn(),
 }))
 
 // Deferred imports — resolved after mocks are set up
 import { POST } from '@/app/api/webhooks/github/[tenantId]/route'
-import { publishEnvelope } from '@/lib/qstash'
-import { lookupTenant } from '@/lib/redis'
+import { publishEnvelope } from '@/lib/messaging/qstash'
+import { lookupTenant } from '@/lib/messaging/redis'
 
 // ────────────────────────────────────────────────────────────
 // Helpers

@@ -1,20 +1,9 @@
 import { timingSafeEqual } from 'node:crypto'
 import { headers } from 'next/headers'
 import { notFound } from 'next/navigation'
-import { queryWithTenant } from '@/lib/db'
+import { queryWithTenant } from '@/lib/db/client'
+import type { DraftRow } from '@/types'
 import DraftCard from './DraftCard'
-
-interface DraftRow {
-  id: string
-  saga_id: string
-  persona: string
-  target_platform: 'x' | 'linkedin' | 'telegram'
-  generated_content: string
-  created_at: Date | string
-  posting_token: string
-  deadline_at: Date | string | null
-  saga_version: number
-}
 
 function toISOString(v: Date | string): string {
   return v instanceof Date ? v.toISOString() : v

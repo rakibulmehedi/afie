@@ -6,16 +6,16 @@
 
 // env vars are set via jest.setup.env.js (runs before any module loads)
 
-jest.mock('@/lib/qstash', () => ({
+jest.mock('@/lib/messaging/qstash', () => ({
   publishEnvelope: jest.fn(),
 }))
-jest.mock('@/lib/redis', () => ({
+jest.mock('@/lib/messaging/redis', () => ({
   lookupTenant: jest.fn(),
 }))
 
 import { POST } from '@/app/api/webhooks/telegram/route'
-import { publishEnvelope } from '@/lib/qstash'
-import { lookupTenant } from '@/lib/redis'
+import { publishEnvelope } from '@/lib/messaging/qstash'
+import { lookupTenant } from '@/lib/messaging/redis'
 
 // ────────────────────────────────────────────────────────────
 // Helpers

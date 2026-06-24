@@ -1,20 +1,9 @@
 export const dynamic = 'force-dynamic'
 
-import { timingSafeEqual } from 'node:crypto'
 import type { NextRequest } from 'next/server'
-import { publishEnvelope } from '@/lib/qstash'
-import { lookupTenant } from '@/lib/redis'
-
-function verifyTelegramToken(incoming: string, secret: string): boolean {
-  const a = Buffer.from(incoming)
-  const b = Buffer.from(secret)
-  if (a.length !== b.length) return false
-  return timingSafeEqual(a, b)
-}
-
-function isPositiveInt(val: unknown): val is number {
-  return typeof val === 'number' && Number.isInteger(val) && val > 0
-}
+import { publishEnvelope } from '@/lib/messaging/qstash'
+import { lookupTenant } from '@/lib/messaging/redis'
+import { verifyTelegramToken, isPositiveInt } from '@/lib/webhooks/telegram'
 
 export async function POST(request: NextRequest): Promise<Response> {
   const secret = process.env.TELEGRAM_WEBHOOK_SECRET

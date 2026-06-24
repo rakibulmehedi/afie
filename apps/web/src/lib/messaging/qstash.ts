@@ -1,11 +1,7 @@
 import { Client } from '@upstash/qstash'
+import type { QStashEnvelope } from '@/types'
 
-export interface QStashEnvelope {
-  idempotency_key: string
-  source: 'github' | 'telegram'
-  raw_payload: string
-  tenant_id: string
-}
+export type { QStashEnvelope }
 
 const URL_GROUP = process.env.QSTASH_URL_GROUP ?? 'ingest'
 

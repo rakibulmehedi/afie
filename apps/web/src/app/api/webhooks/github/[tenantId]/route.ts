@@ -1,30 +1,14 @@
 export const dynamic = 'force-dynamic'
 
-import { timingSafeEqual, createHmac } from 'node:crypto'
 import type { NextRequest } from 'next/server'
-import { publishEnvelope } from '@/lib/qstash'
-import { lookupTenant } from '@/lib/redis'
-
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
-const FRESHNESS_MS = 5 * 60 * 1000
-
-function verifyGitHubSignature(rawBody: Buffer, sigHeader: string, secret: string): boolean {
-  const expected = 'sha256=' + createHmac('sha256', secret).update(rawBody).digest('hex')
-  const a = Buffer.from(sigHeader.padEnd(expected.length, '\0'))
-  const b = Buffer.from(expected.padEnd(sigHeader.length, '\0'))
-  if (a.length !== b.length) return false
-  return timingSafeEqual(a, b)
-}
-
-function extractTimestamp(body: string): Date | null {
-  try {
-    const parsed = JSON.parse(body)
-    const ts = parsed.created_at ?? parsed.pushed_at ?? parsed.updated_at
-    return ts ? new Date(ts) : null
-  } catch {
-    return null
-  }
-}
+import { publishEnvelope } from '@/lib/messaging/qstash'
+import { lookupTenant } from '@/lib/messaging/redis'
+import {
+  verifyGitHubSignature,
+  extractTimestamp,
+  isValidDeliveryUUID,
+  FRESHNESS_MS,
+} from '@/lib/webhooks/github'
 
 export async function POST(
   request: NextRequest,
@@ -48,7 +32,7 @@ export async function POST(
 
   // 3. Delivery UUID validation (api_contracts §5.3.7)
   const deliveryUUID = request.headers.get('x-github-delivery') ?? ''
-  if (!UUID_RE.test(deliveryUUID)) {
+  if (!isValidDeliveryUUID(deliveryUUID)) {
     return new Response('Bad Request: malformed X-GitHub-Delivery', { status: 400 })
   }
 
