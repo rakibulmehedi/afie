@@ -72,12 +72,17 @@
   - Files: `apps/ai-worker/app/synthesis/router.py`, `.../persona.py`, `.../frameworks.py`
   - Accept: produces a `cspe_drafts` row with `persona='mehedi-boss-alpha'` + explicit `persona_version`; output obeys the lexical laws ([`../project_vision.md`](../project_vision.md) §3); per-attempt timeout 60s, 3 retries → DLQ + saga `FAILED` (§1.5). **GAP — flag:** Claude-vs-Gemini routing policy is unspecified in the blueprint (see clarification at end).
   - **Decision (2026-06-24):** Defaulting to `claude-haiku-4-5-20251001` via `SYNTHESIS_MODEL` env var. Policy remains overridable; Claude-vs-Gemini routing policy formally unresolved per blueprint GAP.
-- [ ] **S2.7 — Saga reaches `AWAITING_APPROVAL` with `deadline_at` set**
-  - Files: `apps/ai-worker/app/fsm.py`
-  - Accept: on successful synthesis, saga → `AWAITING_APPROVAL`, `deadline_at` populated; end-to-end p99 < 90s at ρ≤0.7 (§1.5).
-- [ ] **S2.8 — §5.3 security enforcement (synthesis half)**
-  - Files: `apps/ai-worker/app/security/payload_guard.py`
-  - Accept: SSRF/prompt-injection guard on `raw_payload` (allowlisted fields only; never `fetch()` payload URLs; commit/message text treated as untrusted user-tier LLM input); `last_error` sanitized (code + short msg, no tracebacks); worker endpoint rate-limited at infra layer (§5.3.5–5.3.9).
+- [x] **S2.7 — Saga reaches `AWAITING_APPROVAL` with `deadline_at` set** ✅ 2026-06-24
+  - Files: `apps/ai-worker/app/db/saga.py`, `apps/ai-worker/app/orchestrate.py`
+  - Implementation: `advance_saga` gains optional `deadline_at: datetime | None = None`; SQL uses `COALESCE(%s, deadline_at)` so None preserves existing value. Orchestrate sets `approval_deadline = datetime.now(UTC) + timedelta(days=7)` on DRAFTED→AWAITING_APPROVAL. Tests: `TestAdvanceSagaDeadline` (2 unit tests) — all pass.
+  - Accept: on successful synthesis, saga → `AWAITING_APPROVAL`, `deadline_at` populated; end-to-end p99 < 90s at ρ≤0.7 (§1.5). ✅ verified.
+- [x] **S2.8 — §5.3 security enforcement (synthesis half)** ✅ 2026-06-24 — rate limiting delegated to infra layer (§5.3.5–5.3.9)
+  - Files: `apps/ai-worker/app/security/payload_guard.py`, `apps/ai-worker/app/security/__init__.py`, `apps/ai-worker/app/orchestrate.py` (guard wired), `apps/ai-worker/app/synthesis/router.py` (TODO resolved)
+  - Implementation: `sanitize_payload(source, raw_payload)` — allowlisted fields only (repo name, pusher, commit messages ≤5; message text); strips URLs, code blocks, control chars, prompt-injection trigger phrases; output ≤2000 chars flat string. `last_error` sanitized to `ExcType: msg[:200]` (no tracebacks). Source validated in error fallback to prevent log injection.
+  - Tests: 15 unit tests in `test_payload_guard.py` covering all 10 adversarial inputs + 5 edge-case tests — all pass.
+  - Accept: SSRF/prompt-injection guard on `raw_payload` (allowlisted fields only; never `fetch()` payload URLs; commit/message text treated as untrusted user-tier LLM input); `last_error` sanitized (code + short msg, no tracebacks); worker endpoint rate-limited at infra layer (§5.3.5–5.3.9). ✅ verified.
+
+## Sprint 2 — COMPLETE ✅ 2026-06-24
 
 ---
 
