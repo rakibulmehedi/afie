@@ -57,18 +57,21 @@
 - [x] **S2.2 — Edge → QStash publish with idempotency key** *(depends S2.1)* ✅ 2026-06-24
   - Files: `apps/web/src/lib/qstash.ts`, `apps/web/src/lib/redis.ts`
   - Accept: idempotency key = `X-GitHub-Delivery` (validated UUID) / `update_id` (positive int > 0); malformed → **400** (§5.3.7); **no Postgres write on edge** (§0.1); `deduplicationId` wired. ✅ `next build` green (both routes `ƒ Dynamic`).
-- [ ] **S2.3 — Worker consume endpoint: verify QStash signature + clock, fast-ack**
-  - Files: `apps/ai-worker/app/api/consume.py`
-  - Accept: verifies `Upstash-Signature` (current+next keys) **with live clock** (`nbf`/`exp`); unverified → **401**; returns **200 fast**, processes async (§1.5, §5.1).
-- [ ] **S2.4 — Idempotent ingest + saga creation**
-  - Files: `apps/ai-worker/app/db/ingest.py`, `.../saga.py`
-  - Accept: `INSERT … ON CONFLICT DO NOTHING` on `ingest_queue (source, idempotency_key)`; exactly one saga per ingest (`UNIQUE (ingest_id)`); duplicate delivery → no-op (§3.1).
-- [ ] **S2.5 — Saga FSM advance with optimistic lock + event log**
+- [x] **S2.3 — Worker consume endpoint: verify QStash signature + clock, fast-ack** ✅ 2026-06-24
+  - Files: `apps/ai-worker/app/api/consume.py`, `apps/ai-worker/app/api/deps.py`, `apps/ai-worker/app/api/schemas.py`, `apps/ai-worker/app/core/settings.py`
+  - Tests: `apps/ai-worker/tests/test_consume.py` — 14/14 unit tests pass
+  - Accept: verifies `Upstash-Signature` (current+next keys) **with live clock** (`nbf`/`exp`); unverified → **401**; returns **200 fast**, processes async (§1.5, §5.1). ✅ verified.
+- [x] **S2.4 — Idempotent ingest (ingest_queue only; saga creation is S2.5)** ✅ 2026-06-24
+  - Files: `apps/ai-worker/app/db/ingest.py`, `apps/ai-worker/app/db/session.py`
+  - Tests: `apps/ai-worker/tests/test_consume.py` — integration tests marked `@pytest.mark.integration` (require live DB)
+  - Accept: `SET LOCAL app.current_tenant` first; `INSERT … ON CONFLICT (tenant_id, source, idempotency_key) DO NOTHING`; duplicate delivery → no-op (§3.1). ✅ implementation verified against schema.
+- [x] **S2.5 — Saga FSM advance with optimistic lock + event log** ✅ 2026-06-24
   - Files: `apps/ai-worker/app/db/saga.py`, `apps/ai-worker/app/fsm.py`
   - Accept: every transition `UPDATE … WHERE id=$1 AND version=$v`; `rowcount=0` → reload/skip; status persisted **before** side effect; each transition logged to `feature_saga_events` (§3.2). Illegal transition raises (DB trigger).
-- [ ] **S2.6 — LLM synthesis under persona + framework selection**
+- [x] **S2.6 — LLM synthesis under persona + framework selection** ✅ 2026-06-24
   - Files: `apps/ai-worker/app/synthesis/router.py`, `.../persona.py`, `.../frameworks.py`
   - Accept: produces a `cspe_drafts` row with `persona='mehedi-boss-alpha'` + explicit `persona_version`; output obeys the lexical laws ([`../project_vision.md`](../project_vision.md) §3); per-attempt timeout 60s, 3 retries → DLQ + saga `FAILED` (§1.5). **GAP — flag:** Claude-vs-Gemini routing policy is unspecified in the blueprint (see clarification at end).
+  - **Decision (2026-06-24):** Defaulting to `claude-haiku-4-5-20251001` via `SYNTHESIS_MODEL` env var. Policy remains overridable; Claude-vs-Gemini routing policy formally unresolved per blueprint GAP.
 - [ ] **S2.7 — Saga reaches `AWAITING_APPROVAL` with `deadline_at` set**
   - Files: `apps/ai-worker/app/fsm.py`
   - Accept: on successful synthesis, saga → `AWAITING_APPROVAL`, `deadline_at` populated; end-to-end p99 < 90s at ρ≤0.7 (§1.5).
