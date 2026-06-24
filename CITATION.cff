@@ -1,0 +1,21 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+type: software
+title: "Autonomous Founder Identity Engine (AFIE)"
+abstract: "Multi-tenant SaaS that operates founder identities in public autonomously — ingests engineering signals, synthesizes persona-true content via LLM, gates drafts behind human approval, and distributes across platforms."
+authors:
+  - family-names: "Islam Mehedi"
+    given-names: "Rakibul"
+    email: rakibulmehedi.dev@gmail.com
+repository-code: "https://github.com/rakibulmehedi/afie"
+license: MIT
+date-released: "2026-06-25"
+version: "0.1.0"
+keywords:
+  - autonomous-agents
+  - founder-identity
+  - ai-content-generation
+  - multi-tenant-saas
+  - llm
+  - python
+  - nextjs
