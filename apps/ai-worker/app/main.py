@@ -18,9 +18,11 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
 app = FastAPI(lifespan=lifespan)
 
+from app.api.approve import router as approve_router  # noqa: E402
 from app.api.consume import router as consume_router  # noqa: E402
 
 app.include_router(consume_router, prefix="/api/v1")
+app.include_router(approve_router, prefix="/api/v1")
 
 
 @app.get("/healthz")

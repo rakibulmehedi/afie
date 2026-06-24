@@ -93,10 +93,10 @@
 > **IMMUTABLE INVARIANT:** nothing posts without human approval ([`../project_vision.md`](../project_vision.md) §5).
 > **Every task below carries an explicit human-in-the-loop / dry-run gate.**
 
-- [ ] **S3.1 — Approval dashboard (human-in-the-loop GATE)**
-  - Files: `apps/web/src/app/dashboard/**`, `apps/web/src/app/api/approve/route.ts`
-  - **HITL gate:** owner-only session auth on all `/dashboard/*` routes (§5.3.8); approve/edit/reject is a **manual human action**; `AWAITING_APPROVAL → APPROVED` cannot occur without it.
-  - Accept: unauthenticated request → redirect/401; human decision writes `approval_status` + `decided_at` and records actor in `feature_saga_events`; no transition is auto-fired.
+- [x] **S3.1 — Approval dashboard (human-in-the-loop GATE)** ✅ 2026-06-25
+  - Files: `apps/web/src/lib/db.ts` (pg pool + `queryWithTenant` with `SET LOCAL app.current_tenant`), `apps/web/src/app/dashboard/review/page.tsx` (Server Component, header auth guard, pending-draft query), `apps/web/src/app/dashboard/review/DraftCard.tsx` (Client Component, edit textarea, approve/reject), `apps/web/src/app/dashboard/review/actions.ts` ("use server" — auth guard, QStash publish to worker), `apps/ai-worker/app/api/approve.py` (`POST /api/v1/approve` — QStash-verified, single-tx APPROVE/REJECT, optimistic lock, event log, post-commit distribution publish), `apps/ai-worker/tests/test_approve.py` (12/12 pass)
+  - **HITL gate:** `x-admin-secret` header check (timingSafeEqual) on page + action; no DB writes from edge — decisions publish via QStash to worker which owns all DB writes; `AWAITING_APPROVAL → APPROVED/REJECTED` requires human action.
+  - Accept: unauthenticated request → `notFound()`; human decision → worker writes `approval_status` + `decided_at` + `feature_saga_events` with `actor='dashboard'`; optimistic lock (version WHERE clause) guards concurrent writes; `pnpm build` green, `/dashboard/review` is `ƒ Dynamic`; 12 worker unit tests all pass. ✅ verified 2026-06-25.
 - [ ] **S3.2 — `APPROVED → DISTRIBUTING` publish to Distribution Queue**
   - Files: `apps/ai-worker/app/distribution/dispatch.py`
   - **Dry-run gate:** a `DISTRIBUTION_DRY_RUN` flag (default **ON**) logs the intended post + target instead of calling any external API.

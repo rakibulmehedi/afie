@@ -14,6 +14,7 @@
     "@upstash/qstash": "^2.11.1",
     "@upstash/redis": "^1.38.0",
     "next": "16.2.9",
+    "pg": "^8.22.0",
     "react": "19.2.4",
     "react-dom": "19.2.4"
   },
@@ -21,6 +22,7 @@
     "@tailwindcss/postcss": "^4",
     "@types/jest": "^30.0.0",
     "@types/node": "^20",
+    "@types/pg": "^8.20.0",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9",

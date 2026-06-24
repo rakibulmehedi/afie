@@ -9,3 +9,11 @@ class ConsumePayload(BaseModel):
     source: Literal["github", "telegram"]
     idempotency_key: str = Field(min_length=1, max_length=512)
     raw_payload: str  # JSON string from QStash envelope
+
+
+class ApprovePayload(BaseModel):
+    draft_id: UUID
+    tenant_id: UUID
+    decision: Literal["APPROVE", "REJECT"]
+    edited_content: str | None = None
+    actor: str = "dashboard"
