@@ -1,0 +1,6 @@
+# Global owner
+* @rakibulmehedi
+
+# Runtime-specific
+apps/web/ @rakibulmehedi
+apps/ai-worker/ @rakibulmehedi
