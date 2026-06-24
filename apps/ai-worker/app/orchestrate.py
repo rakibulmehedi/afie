@@ -14,10 +14,12 @@ from __future__ import annotations
 import asyncio
 import logging
 import uuid
+from datetime import datetime, timedelta, timezone
 from typing import Final
 
 from app.api.schemas import ConsumePayload
 from app.fsm import SagaStatus
+from app.security.payload_guard import sanitize_payload
 
 logger = logging.getLogger(__name__)
 
@@ -128,11 +130,14 @@ async def orchestrate_pipeline(payload: ConsumePayload) -> None:
         system_prompt = build_system_prompt(blueprint_row)
         model = get_synthesis_model()
 
+        # S2.8: guard applied via sanitize_payload before passing to LLM
+        sanitized = sanitize_payload(payload.source, payload.raw_payload)
+
         llm_output: str | None = None
         last_exc: Exception | None = None
         for attempt in range(MAX_SYNTHESIS_RETRIES):
             try:
-                llm_output = await synthesize(system_prompt, payload.raw_payload, model)
+                llm_output = await synthesize(system_prompt, sanitized, model)
                 break
             except (SynthesisTimeoutError, SynthesisError) as exc:
                 last_exc = exc
@@ -150,10 +155,15 @@ async def orchestrate_pipeline(payload: ConsumePayload) -> None:
         # Phase 3a: All retries exhausted → mark FAILED and return.
         # ------------------------------------------------------------------
         if llm_output is None:
+            safe_error = (
+                f"{type(last_exc).__name__}: {str(last_exc)[:200]}"
+                if last_exc
+                else "unknown"
+            )
             logger.error(
                 "All synthesis retries exhausted saga=%s last_error=%s",
                 saga_id,
-                last_exc,
+                safe_error,
             )
             async with pool.connection() as conn2:
                 async with conn2.transaction():
@@ -229,7 +239,8 @@ async def orchestrate_pipeline(payload: ConsumePayload) -> None:
                     (str(payload.tenant_id), saga_id, blueprint_id, llm_output),
                 )
 
-                # DRAFTED → AWAITING_APPROVAL
+                # DRAFTED → AWAITING_APPROVAL (S2.7: set 7-day approval deadline)
+                approval_deadline = datetime.now(timezone.utc) + timedelta(days=7)
                 if not await _adv(
                     conn3,
                     saga_id,
@@ -237,6 +248,7 @@ async def orchestrate_pipeline(payload: ConsumePayload) -> None:
                     SagaStatus.DRAFTED,
                     SagaStatus.AWAITING_APPROVAL,
                     current_version + 1,
+                    deadline_at=approval_deadline,
                 ):
                     logger.warning(
                         "Stale lock DRAFTED→AWAITING_APPROVAL saga=%s", saga_id
