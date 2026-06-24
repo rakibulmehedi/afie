@@ -1,10 +1,8 @@
 """
 Async LLM caller with timeout and retry support for the CSPE synthesis package.
 
-IMPORTANT SECURITY NOTE:
-# TODO S2.8: raw_payload is untrusted user-tier input. S2.8 (payload_guard.py)
-# must sanitize this before production use. For now, pass as-is but NEVER
-# include it in the system_prompt. Treat as user message only.
+Security: raw_payload (user message) is sanitized by the caller via
+app.security.payload_guard.sanitize_payload before reaching this module (S2.8).
 """
 
 from __future__ import annotations
@@ -65,10 +63,7 @@ async def synthesize(
     - system_prompt: built from tenant blueprint (trusted)
     - raw_payload: the raw webhook payload as user message (UNTRUSTED)
 
-    IMPORTANT SECURITY NOTE:
-    # TODO S2.8: raw_payload is untrusted user-tier input. S2.8 (payload_guard.py)
-    # must sanitize this before production use. For now, pass as-is but NEVER
-    # include it in the system_prompt. Treat as user message only.
+    # S2.8: raw_payload sanitized by caller (orchestrate.py) via sanitize_payload.
 
     Timeout: SYNTHESIS_TIMEOUT_SECONDS (60s) via asyncio.wait_for.
     Raises SynthesisTimeoutError on timeout.
