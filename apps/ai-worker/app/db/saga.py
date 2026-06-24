@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 import uuid
+from datetime import datetime
 
 from psycopg import AsyncConnection
 
@@ -51,6 +52,7 @@ async def advance_saga(
     from_status: str,
     to_status: str,
     version: int,
+    deadline_at: datetime | None = None,
 ) -> bool:
     """Attempt an optimistic-lock transition on the saga FSM.
 
@@ -62,19 +64,23 @@ async def advance_saga(
     The DB trigger ``trg_saga_fsm`` raises if the transition is illegal.
 
     The caller manages the transaction and ``SET LOCAL`` context.
+
+    ``deadline_at`` is optional.  When provided, it sets the approval deadline
+    on the saga row via COALESCE so that None preserves the existing value.
     """
     cursor = await conn.execute(
         """
         UPDATE feature_sagas
-           SET status     = %s,
-               version    = version + 1,
-               updated_at = now()
+           SET status      = %s,
+               version     = version + 1,
+               updated_at  = now(),
+               deadline_at = COALESCE(%s, deadline_at)
          WHERE id         = %s
            AND tenant_id  = %s
            AND version    = %s
            AND status     = %s
         """,
-        (to_status, str(saga_id), str(tenant_id), version, from_status),
+        (to_status, deadline_at, str(saga_id), str(tenant_id), version, from_status),
     )
     if cursor.rowcount == 1:
         await conn.execute(
